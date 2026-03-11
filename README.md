@@ -110,6 +110,20 @@ npm run typecheck
 
 ## 📋 Changelog
 
+### v1.5.2
+
+**Improvements:**
+- 🚀 **Better User Experience**: Removed intrusive popunder ads
+- 🔗 **SmartLink Only**: Kept user-friendly SmartLink ads for sustainable development
+- 🔒 **Enhanced Security**: Simplified Content Security Policy
+- ⚡ **Better Performance**: Removed external ad scripts for faster loading
+
+**Changes:**
+- Removed popunder ad integration
+- Simplified CSP rules for better security
+- Cleaner interface without popup interruptions
+- Maintained revenue stream through optional SmartLink clicks
+
 ### v1.5.1
 
 **New Features:**
