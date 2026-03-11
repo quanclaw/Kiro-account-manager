@@ -483,13 +483,22 @@ export async function callKiroApiStream(
       console.log(`[KiroAPI]   - Payload size: ${payloadStr.length} bytes`)
       
       const headers = getAuthHeaders(account, endpoint)
-      // 流式请求直接发送
+      // 流式请求直接发送，添加30秒超时
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30秒超时
+      
+      const combinedSignal = signal ? 
+        AbortSignal.any([signal, controller.signal]) : 
+        controller.signal
+      
       const response = await fetch(endpoint.url, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
-        signal
+        signal: combinedSignal
       })
+      
+      clearTimeout(timeoutId)
 
       if (response.status === 429) {
         console.log(`[KiroAPI] Endpoint ${endpoint.name} quota exhausted, trying next...`)
@@ -515,6 +524,13 @@ export async function callKiroApiStream(
     } catch (error) {
       lastError = error as Error
       console.error(`[KiroAPI] Endpoint ${endpoint.name} failed:`, error)
+      
+      // 如果是超时错误，记录并继续尝试下一个端点
+      if ((error as Error).name === 'AbortError') {
+        console.log(`[KiroAPI] Endpoint ${endpoint.name} timed out, trying next...`)
+        lastError = new Error(`Request timeout on ${endpoint.name}`)
+        continue
+      }
       
       // 如果是认证错误，不继续尝试其他端点
       if ((error as Error).message.includes('Auth error')) {
@@ -1088,8 +1104,17 @@ export async function fetchKiroModels(account: ProxyAccount): Promise<KiroModel[
       if (account.profileArn) params.set('profileArn', account.profileArn)
       if (nextToken) params.set('nextToken', nextToken)
 
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 15000) // 15秒超时
+      
       const url = `${baseUrl}/ListAvailableModels?${params.toString()}`
-      const response = await fetch(url, { method: 'GET', headers })
+      const response = await fetch(url, { 
+        method: 'GET', 
+        headers,
+        signal: controller.signal
+      })
+      
+      clearTimeout(timeoutId)
       
       if (!response.ok) {
         console.error('[KiroAPI] ListAvailableModels failed:', response.status)
@@ -1144,8 +1169,18 @@ export async function fetchAvailableSubscriptions(account: ProxyAccount): Promis
     'x-amzn-codewhisperer-optout-preference': 'OPTIN'
   }
 
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15000) // 15秒超时
+  
   try {
-    const response = await fetch(url, { method: 'POST', headers, body: '{}' })
+    const response = await fetch(url, { 
+      method: 'POST', 
+      headers, 
+      body: '{}',
+      signal: controller.signal
+    })
+    
+    clearTimeout(timeoutId)
     
     if (!response.ok) {
       console.error('[KiroAPI] ListAvailableSubscriptions failed:', response.status)
@@ -1194,8 +1229,18 @@ export async function fetchSubscriptionToken(
     payload.subscriptionType = subscriptionType
   }
 
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15000) // 15秒超时
+  
   try {
-    const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) })
+    const response = await fetch(url, { 
+      method: 'POST', 
+      headers, 
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    })
+    
+    clearTimeout(timeoutId)
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
