@@ -30,7 +30,22 @@ export function SmartLinkAd({
 
   const handleClick = () => {
     console.log('SmartLink ad clicked:', url)
-    window.api?.openExternal?.(url)
+    console.log('window.api available:', !!window.api)
+    console.log('window.api.openExternal available:', !!window.api?.openExternal)
+    
+    if (window.api?.openExternal) {
+      window.api.openExternal(url)
+      console.log('Called window.api.openExternal')
+    } else {
+      console.error('window.api.openExternal not available, trying fallback')
+      // Fallback: try to open directly
+      try {
+        window.open(url, '_blank')
+        console.log('Fallback window.open called')
+      } catch (error) {
+        console.error('Fallback failed:', error)
+      }
+    }
     
     // Track click and hide for a while
     localStorage.setItem('smartlink-clicked-time', Date.now().toString())

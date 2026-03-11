@@ -1,10 +1,10 @@
 // Ad Configuration
 export const adConfig = {
-  // Popunder ad settings
+  // Popunder ad settings (disabled)
   popunder: {
-    enabled: true,
+    enabled: false,
     scriptUrl: 'https://authoritieswoundjoint.com/3c/84/df/3c84dfb697102abda06f1a1db188ed03.js',
-    delay: 3, // seconds after app start (reduced for testing)
+    delay: 3, // seconds after app start
   },
   
   // SmartLink ad settings
