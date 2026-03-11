@@ -935,23 +935,6 @@ export class ProxyServer {
   private async handleModels(res: http.ServerResponse): Promise<void> {
     const now = Date.now()
     
-    // Kiro 官方模型（与 UI 保持一致）
-    const kiroOfficialModels = [
-      { id: 'auto', object: 'model', created: now, owned_by: 'kiro-api', description: 'Auto select best model' },
-      { id: 'claude-sonnet-4.5', object: 'model', created: now, owned_by: 'kiro-api', description: 'The latest Claude Sonnet model' },
-      { id: 'claude-sonnet-4', object: 'model', created: now, owned_by: 'kiro-api', description: 'Hybrid reasoning and coding' },
-      { id: 'claude-haiku-4.5', object: 'model', created: now, owned_by: 'kiro-api', description: 'The latest Claude Haiku model' },
-      { id: 'claude-opus-4.5', object: 'model', created: now, owned_by: 'kiro-api', description: 'The most powerful model' }
-    ]
-
-    // 预设模型（GPT 兼容别名）
-    const presetModels = [
-      { id: 'gpt-4o', object: 'model', created: now, owned_by: 'kiro-proxy' },
-      { id: 'gpt-4', object: 'model', created: now, owned_by: 'kiro-proxy' },
-      { id: 'gpt-4-turbo', object: 'model', created: now, owned_by: 'kiro-proxy' },
-      { id: 'gpt-3.5-turbo', object: 'model', created: now, owned_by: 'kiro-proxy' }
-    ]
-
     // 尝试从 Kiro API 获取动态模型
     let kiroModels: KiroModel[] = []
     
@@ -984,19 +967,19 @@ export class ProxyServer {
       model_name: m.modelName
     }))
 
+    // 预设模型（GPT 兼容别名）- 只有在有动态模型时才添加
+    const presetModels = dynamicModels.length > 0 ? [
+      { id: 'gpt-4o', object: 'model', created: now, owned_by: 'kiro-proxy' },
+      { id: 'gpt-4', object: 'model', created: now, owned_by: 'kiro-proxy' },
+      { id: 'gpt-4-turbo', object: 'model', created: now, owned_by: 'kiro-proxy' },
+      { id: 'gpt-3.5-turbo', object: 'model', created: now, owned_by: 'kiro-proxy' }
+    ] : []
+
     // 合并模型列表，去重
     const modelIds = new Set<string>()
     const allModels: Array<{ id: string; object: string; created: number; owned_by: string; description?: string; model_name?: string }> = []
     
-    // 1. 先添加 Kiro 官方模型（与 UI 保持一致）
-    for (const m of kiroOfficialModels) {
-      if (!modelIds.has(m.id)) {
-        modelIds.add(m.id)
-        allModels.push(m)
-      }
-    }
-    
-    // 2. 添加动态模型（从 API 获取的，可能有额外模型）
+    // 1. 添加动态模型（从 API 获取的）
     for (const m of dynamicModels) {
       if (!modelIds.has(m.id)) {
         modelIds.add(m.id)
@@ -1004,12 +987,17 @@ export class ProxyServer {
       }
     }
     
-    // 3. 添加 GPT 兼容别名
+    // 2. 添加 GPT 兼容别名（只有在有动态模型时）
     for (const m of presetModels) {
       if (!modelIds.has(m.id)) {
         modelIds.add(m.id)
         allModels.push(m)
       }
+    }
+
+    // 如果没有任何模型，返回空列表
+    if (allModels.length === 0) {
+      console.warn('[ProxyServer] No models available from Kiro API')
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' })

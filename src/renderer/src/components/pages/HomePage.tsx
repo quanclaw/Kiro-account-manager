@@ -158,7 +158,7 @@ export function HomePage() {
         </div>
       </div>
 
-      {/* API Gateway Status Card - KiroaaS Style */}
+      {/* API Gateway Status Card - Kiro Style */}
       {gatewayStatus.running ? (
         <div className="relative overflow-hidden rounded-[32px] bg-[#EBFD93] p-8 border-0 shadow-sm">
           {/* Decorative background heartbeat */}

@@ -1,10 +1,10 @@
-import { Home, Users, Settings, Info, Server, Activity, MessageCircle } from 'lucide-react'
+import { Home, Users, Settings, Info, Server, Activity, MessageCircle, Code } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import kiroLogo from '@/assets/Kiro Logo.png'
 import { useAccountsStore } from '@/store/accounts'
 import { useTranslation } from '@/hooks/useTranslation'
 
-export type PageType = 'home' | 'accounts' | 'proxy' | 'chat' | 'logs' | 'settings' | 'about'
+export type PageType = 'home' | 'accounts' | 'proxy' | 'chat' | 'logs' | 'api-examples' | 'settings' | 'about'
 
 interface SidebarProps {
   currentPage: PageType
@@ -19,6 +19,7 @@ const menuItemsConfig: { id: PageType; labelKey: string; icon: React.ElementType
   { id: 'proxy', labelKey: 'nav.proxy', icon: Server },
   { id: 'chat', labelKey: 'nav.chat', icon: MessageCircle },
   { id: 'logs', labelKey: 'nav.logs', icon: Activity },
+  { id: 'api-examples', labelKey: 'nav.apiExamples', icon: Code },
   { id: 'settings', labelKey: 'nav.settings', icon: Settings },
   { id: 'about', labelKey: 'nav.about', icon: Info },
 ]
@@ -43,7 +44,7 @@ export function Sidebar({ currentPage, onPageChange, collapsed }: SidebarProps) 
           </div>
           {!collapsed && (
             <div>
-              <span className="text-white font-bold text-lg tracking-tight block leading-none">KiroaaS</span>
+              <span className="text-white font-bold text-lg tracking-tight block leading-none">Kiro</span>
               <span className="text-[#999999] text-xs font-medium tracking-wide">
                 {t('common.unknown') === 'Unknown' ? 'Kiro as a Service' : 'Kiro 即服务'}
               </span>

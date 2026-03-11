@@ -116,7 +116,3 @@ npm run typecheck
 ```
 
 ---
-
-## 📋 Changelog
-
-See [root README](../README.md#-changelog) for full changelog.

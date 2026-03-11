@@ -67,30 +67,38 @@ const THINKING_MODE_PROMPT = `<thinking_mode>enabled</thinking_mode>
 
 // 模型 ID 映射
 const MODEL_ID_MAP: Record<string, string> = {
-  // Claude 4.5 系列
-  'claude-sonnet-4-5': 'claude-sonnet-4.5',
-  'claude-sonnet-4.5': 'claude-sonnet-4.5',
-  'claude-haiku-4-5': 'claude-haiku-4.5',
-  'claude-haiku-4.5': 'claude-haiku-4.5',
-  'claude-opus-4-5': 'claude-opus-4.5',
-  'claude-opus-4.5': 'claude-opus-4.5',
-  // Claude 4 系列
-  'claude-sonnet-4': 'claude-sonnet-4',
-  'claude-sonnet-4-20250514': 'claude-sonnet-4',
-  // Claude 3.5 系列 (映射到 Sonnet 4.5)
-  'claude-3-5-sonnet': 'claude-sonnet-4.5',
-  'claude-3-opus': 'claude-sonnet-4.5',
-  'claude-3-sonnet': 'claude-sonnet-4',
-  'claude-3-haiku': 'claude-haiku-4.5',
-  // GPT 兼容映射 (映射到 Sonnet 4.5)
+  // GPT 兼容映射 (映射到 Claude models)
   'gpt-4': 'claude-sonnet-4.5',
   'gpt-4o': 'claude-sonnet-4.5',
   'gpt-4-turbo': 'claude-sonnet-4.5',
   'gpt-3.5-turbo': 'claude-sonnet-4.5',
+  // Claude 3.x 系列映射到 4.x (for backward compatibility)
+  'claude-3-5-sonnet': 'claude-sonnet-4.5',
+  'claude-3-opus': 'claude-sonnet-4.5',
+  'claude-3-sonnet': 'claude-sonnet-4',
+  'claude-3-haiku': 'claude-haiku-4.5',
   'default': 'claude-sonnet-4.5'
 }
 
 export function mapModelId(model: string): string {
+  // First, check if the model should be used as-is (no mapping needed)
+  // These are models that are directly supported by Kiro API
+  const directModels = [
+    'auto',
+    'claude-sonnet-4.5',
+    'claude-sonnet-4',
+    'claude-haiku-4.5',
+    'claude-opus-4.5',
+    'deepseek-3.2',
+    'minimax-m2.1',
+    'qwen3-coder-next'
+  ]
+  
+  if (directModels.includes(model)) {
+    return model
+  }
+  
+  // For models that need mapping (like GPT aliases)
   const lower = model.toLowerCase()
   for (const [key, value] of Object.entries(MODEL_ID_MAP)) {
     if (lower.includes(key)) {

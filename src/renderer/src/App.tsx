@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { AccountManager } from './components/accounts'
 import { Sidebar, type PageType } from './components/layout'
-import { HomePage, AboutPage, SettingsPage, ProxyPage, LogsPage, ChatPage } from './components/pages'
+import { HomePage, AboutPage, SettingsPage, ProxyPage, LogsPage, ChatPage, ApiExamplesPage } from './components/pages'
 import { UpdateDialog } from './components/UpdateDialog'
 import { CloseConfirmDialog } from './components/CloseConfirmDialog'
 import { useAccountsStore } from './store/accounts'
@@ -255,6 +255,8 @@ function App(): React.JSX.Element {
         return <ChatPage />
       case 'logs':
         return <LogsPage />
+      case 'api-examples':
+        return <ApiExamplesPage />
       case 'settings':
         return <SettingsPage />
       case 'about':

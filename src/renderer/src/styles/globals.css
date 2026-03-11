@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* KiroaaS Exact Design System */
+  /* Kiro Exact Design System */
   /* Light mode */
   --color-background: #E8E8E8;
   --color-foreground: #111111;
@@ -32,7 +32,7 @@
   --color-sidebar-hover: #2A2A2A;
   --color-sidebar-active: #2A2A2A;
   
-  /* Border radius - KiroaaS style */
+  /* Border radius - Kiro style */
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;

@@ -50,6 +50,7 @@ const zh = {
     kproxy: 'K-Proxy',
     chat: '对话',
     logs: '日志',
+    apiExamples: 'API 示例',
     settings: '设置',
     about: '关于'
   },

@@ -50,6 +50,7 @@ const en = {
     kproxy: 'K-Proxy',
     chat: 'Chat',
     logs: 'Logs',
+    apiExamples: 'API Examples',
     settings: 'Settings',
     about: 'About'
   },
