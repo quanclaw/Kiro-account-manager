@@ -1,0 +1,6 @@
+export { HomePage } from './HomePage'
+export { AboutPage } from './AboutPage'
+export { SettingsPage } from './SettingsPage'
+export { ProxyPage } from './ProxyPage'
+export { ChatPage } from './ChatPage'
+export { LogsPage } from './LogsPage'
