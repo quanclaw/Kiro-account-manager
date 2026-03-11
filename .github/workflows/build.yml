@@ -2,10 +2,9 @@ name: Build & Release
 
 on:
   workflow_dispatch:
-
-# 设置工作目录
-env:
-  WORKING_DIR: Kiro-account-manager
+  push:
+    tags:
+      - 'v*.*.*'
 
 jobs:
   # 获取版本号
@@ -22,7 +21,6 @@ jobs:
 
       - name: Get version from package.json
         id: get_version
-        working-directory: ${{ env.WORKING_DIR }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
@@ -76,18 +74,15 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: ${{ env.WORKING_DIR }}
         run: npm ci
 
       - name: Build
-        working-directory: ${{ env.WORKING_DIR }}
         run: npm run build
 
       - name: Package Windows ${{ matrix.arch }}
-        working-directory: ${{ env.WORKING_DIR }}
         run: npx electron-builder --win --${{ matrix.arch }} -p never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -97,10 +92,10 @@ jobs:
         with:
           name: windows-${{ matrix.arch }}
           path: |
-            ${{ env.WORKING_DIR }}/dist/*.exe
-            ${{ env.WORKING_DIR }}/dist/*.zip
-            ${{ env.WORKING_DIR }}/dist/*.yml
-            ${{ env.WORKING_DIR }}/dist/*.blockmap
+            dist/*.exe
+            dist/*.zip
+            dist/*.yml
+            dist/*.blockmap
           if-no-files-found: ignore
 
   build-windows-arm64:
@@ -123,18 +118,15 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: ${{ env.WORKING_DIR }}
         run: npm ci
 
       - name: Build
-        working-directory: ${{ env.WORKING_DIR }}
         run: npm run build
 
       - name: Package Windows ARM64
-        working-directory: ${{ env.WORKING_DIR }}
         run: npx electron-builder --win --arm64 -p never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -144,10 +136,10 @@ jobs:
         with:
           name: windows-arm64
           path: |
-            ${{ env.WORKING_DIR }}/dist/*.exe
-            ${{ env.WORKING_DIR }}/dist/*.zip
-            ${{ env.WORKING_DIR }}/dist/*.yml
-            ${{ env.WORKING_DIR }}/dist/*.blockmap
+            dist/*.exe
+            dist/*.zip
+            dist/*.yml
+            dist/*.blockmap
           if-no-files-found: ignore
 
   build-macos:
@@ -173,18 +165,15 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: ${{ env.WORKING_DIR }}
         run: npm ci
 
       - name: Build
-        working-directory: ${{ env.WORKING_DIR }}
         run: npm run build
 
       - name: Package macOS ${{ matrix.arch }}
-        working-directory: ${{ env.WORKING_DIR }}
         run: npx electron-builder --mac --${{ matrix.arch }} -p never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -194,10 +183,10 @@ jobs:
         with:
           name: macos-${{ matrix.arch }}
           path: |
-            ${{ env.WORKING_DIR }}/dist/*.dmg
-            ${{ env.WORKING_DIR }}/dist/*.zip
-            ${{ env.WORKING_DIR }}/dist/*.yml
-            ${{ env.WORKING_DIR }}/dist/*.blockmap
+            dist/*.dmg
+            dist/*.zip
+            dist/*.yml
+            dist/*.blockmap
           if-no-files-found: ignore
 
   build-linux:
@@ -227,18 +216,15 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: ${{ env.WORKING_DIR }}
         run: npm ci
 
       - name: Build
-        working-directory: ${{ env.WORKING_DIR }}
         run: npm run build
 
       - name: Package Linux ${{ matrix.arch }}
-        working-directory: ${{ env.WORKING_DIR }}
         run: |
           if [ "${{ matrix.arch }}" = "x64" ]; then
             # x64 构建所有目标（包括 snap）
@@ -255,12 +241,12 @@ jobs:
         with:
           name: linux-${{ matrix.arch }}
           path: |
-            ${{ env.WORKING_DIR }}/dist/*.AppImage
-            ${{ env.WORKING_DIR }}/dist/*.deb
-            ${{ env.WORKING_DIR }}/dist/*.snap
-            ${{ env.WORKING_DIR }}/dist/*.tar.gz
-            ${{ env.WORKING_DIR }}/dist/*.yml
-            ${{ env.WORKING_DIR }}/dist/*.blockmap
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.snap
+            dist/*.tar.gz
+            dist/*.yml
+            dist/*.blockmap
           if-no-files-found: ignore
 
   release:
