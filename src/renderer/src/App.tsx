@@ -4,6 +4,8 @@ import { Sidebar, type PageType } from './components/layout'
 import { HomePage, AboutPage, SettingsPage, ProxyPage, LogsPage, ChatPage, ApiExamplesPage } from './components/pages'
 import { UpdateDialog } from './components/UpdateDialog'
 import { CloseConfirmDialog } from './components/CloseConfirmDialog'
+import { AdModal, PopunderAd } from './components/ads'
+import { adConfig } from './config/ads'
 import { useAccountsStore } from './store/accounts'
 
 function App(): React.JSX.Element {
@@ -294,6 +296,8 @@ function App(): React.JSX.Element {
       
       <UpdateDialog />
       <CloseConfirmDialog />
+      {adConfig.modal.enabled && <AdModal />}
+      {adConfig.popunder.enabled && <PopunderAd delay={adConfig.popunder.delay} />}
     </div>
   )
 }

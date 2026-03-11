@@ -3,6 +3,8 @@ import { cn } from '@/lib/utils'
 import kiroLogo from '@/assets/Kiro Logo.png'
 import { useAccountsStore } from '@/store/accounts'
 import { useTranslation } from '@/hooks/useTranslation'
+import { SmartLinkAd } from '../ads/SmartLinkAd'
+import { adConfig } from '@/config/ads'
 
 export type PageType = 'home' | 'accounts' | 'proxy' | 'chat' | 'logs' | 'api-examples' | 'settings' | 'about'
 
@@ -91,7 +93,7 @@ export function Sidebar({ currentPage, onPageChange, collapsed }: SidebarProps) 
         </nav>
       </div>
 
-      {/* Footer Area - Language selector */}
+      {/* Footer Area - Language selector and Ad */}
       <div className="flex flex-col items-center lg:items-start lg:px-6 space-y-4">
         {activeAccount && !collapsed && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#2A2A2A] w-full">
@@ -99,6 +101,17 @@ export function Sidebar({ currentPage, onPageChange, collapsed }: SidebarProps) 
             <span className="text-xs text-[#999999] truncate">
               {activeAccount.email?.split('@')[0] || 'Active'}
             </span>
+          </div>
+        )}
+        
+        {/* SmartLink Ad */}
+        {!collapsed && adConfig.smartlink.enabled && (
+          <div className="w-full">
+            <SmartLinkAd 
+              url={adConfig.smartlink.url}
+              text={adConfig.smartlink.text}
+              className="w-full"
+            />
           </div>
         )}
       </div>

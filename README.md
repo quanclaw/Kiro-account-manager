@@ -110,6 +110,23 @@ npm run typecheck
 
 ## 📋 Changelog
 
+### v1.5.1
+
+**New Features:**
+- 💰 **Ad Integration**: Popunder and SmartLink ads for sustainable development
+- 🔧 **Better SQLite3 Support**: Fixed native module integration for auto-import features
+- 🛡️ **Enhanced CSP**: Updated Content Security Policy for ad network compatibility
+
+**Improvements:**
+- Optimized ad loading with user interaction triggers
+- Better error handling for blocked scripts
+- Cleaner About page interface
+
+**Bug Fixes:**
+- Fixed better-sqlite3 module loading errors
+- Resolved Content Security Policy blocking issues
+- Improved ad script loading reliability
+
 ### v1.5.0
 
 **New Features:**
@@ -134,7 +151,7 @@ npm run typecheck
 
 ## 👨‍💻 Author
 
-- **GitHub**: [chaogei](https://github.com/ProTechPh)
+- **GitHub**: [ProTechPh](https://github.com/ProTechPh)
 - **Project Homepage**: [Kiro-account-manager](https://github.com/ProTechPh/Kiro-account-manager)
 
 ---

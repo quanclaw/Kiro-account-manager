@@ -9,6 +9,8 @@ import authorAvatar from '@/assets/author-avatar.png'
 import { useAccountsStore } from '@/store/accounts'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/hooks/useTranslation'
+import { SmartLinkAd } from '../ads/SmartLinkAd'
+import { adConfig } from '@/config/ads'
 
 interface UpdateInfo {
   hasUpdate: boolean
@@ -106,6 +108,17 @@ export function AboutPage() {
             {isEn ? 'Join Group' : '加入交流群'}
           </Button>
         </div>
+        
+        {/* SmartLink Support Button */}
+        {adConfig.smartlink.enabled && (
+          <div className="mt-4">
+            <SmartLinkAd 
+              url={adConfig.smartlink.url}
+              text={isEn ? '💖 Support Development' : '💖 支持开发'}
+              className="max-w-xs mx-auto"
+            />
+          </div>
+        )}
         
         {/* 更新提示 */}
         {updateInfo?.hasUpdate && !showUpdateModal && (
