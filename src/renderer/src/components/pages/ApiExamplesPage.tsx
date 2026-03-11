@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Card } from '../ui'
-import { Code, Copy, Check, ExternalLink } from 'lucide-react'
+import { Code, Copy, Check, ExternalLink, Eye, EyeOff } from 'lucide-react'
 import { Button } from '../ui'
 import { useTranslation } from '@/hooks/useTranslation'
 
@@ -10,7 +10,7 @@ export function ApiExamplesPage() {
   const [activeTab, setActiveTab] = useState<'curl' | 'python' | 'javascript'>('curl')
   const [activeApi, setActiveApi] = useState<'openai' | 'anthropic'>('openai')
   const [copied, setCopied] = useState(false)
-  const [apiKeyCopied, setApiKeyCopied] = useState(false)
+  const [showApiKey, setShowApiKey] = useState(false)
   const [proxyConfig, setProxyConfig] = useState<{ port: number; apiKey?: string }>({ port: 5580 })
 
   const endpoint = `http://127.0.0.1:${proxyConfig.port}`
@@ -214,23 +214,28 @@ console.log(message.content);`
     }
   }
 
-  const copyToClipboard = (text: string, isApiKey = false) => {
+  const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
-    if (isApiKey) {
-      setApiKeyCopied(true)
-      setTimeout(() => setApiKeyCopied(false), 2000)
-    } else {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   const importToCCSwitch = () => {
-    let ccSwitchUrl = `ccswitch://import?provider=Kiro&endpoint=${encodeURIComponent(endpoint)}`
-    if (hasApiKey) {
-      ccSwitchUrl += `&apiKey=${encodeURIComponent(apiKey)}`
+    if (!hasApiKey) {
+      return
     }
-    window.open(ccSwitchUrl, '_blank')
+
+    // Build the ccswitch:// deep link URL (matching KiroaaS format)
+    const params = new URLSearchParams({
+      resource: 'provider',
+      app: 'claude',
+      name: 'Kiro',
+      endpoint: endpoint,
+      apiKey: apiKey
+    })
+
+    const deepLinkUrl = `ccswitch://v1/import?${params.toString()}`
+    window.open(deepLinkUrl, '_blank')
   }
 
   return (
@@ -349,7 +354,18 @@ console.log(message.content);`
                 <Code className="h-5 w-5 text-primary" />
               </div>
               <div className="flex-1">
-                <h3 className="font-medium mb-1">CC Switch</h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-medium">CC Switch</h3>
+                  <a
+                    href="https://github.com/farion1231/cc-switch"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:text-primary/80 transition-colors"
+                    title="View on GitHub"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </div>
                 <p className="text-sm text-muted-foreground">
                   {isEn 
                     ? 'CC Switch is a Claude Code configuration manager that allows quick switching between different API Providers.'
@@ -381,22 +397,22 @@ console.log(message.content);`
                   <div className="flex items-center gap-2">
                     {hasApiKey ? (
                       <>
-                        <span className="text-sm font-mono">••••••••</span>
+                        <span className="text-sm font-mono">{showApiKey ? apiKey : '••••••••'}</span>
                         <button
-                          onClick={() => copyToClipboard(apiKey, true)}
+                          onClick={() => setShowApiKey(!showApiKey)}
                           className="p-1 hover:bg-muted rounded transition-colors"
-                          title={isEn ? 'Copy API Key' : '复制 API 密钥'}
+                          title={showApiKey ? (isEn ? 'Hide API Key' : '隐藏 API 密钥') : (isEn ? 'Show API Key' : '显示 API 密钥')}
                         >
-                          {apiKeyCopied ? (
-                            <Check className="h-3 w-3 text-green-500" />
+                          {showApiKey ? (
+                            <EyeOff className="h-3 w-3" />
                           ) : (
-                            <Copy className="h-3 w-3" />
+                            <Eye className="h-3 w-3" />
                           )}
                         </button>
                       </>
                     ) : (
                       <span className="text-sm text-muted-foreground italic">
-                        {isEn ? 'Not required' : '无需设置'}
+                        {isEn ? 'Not configured' : '未配置'}
                       </span>
                     )}
                   </div>
@@ -406,16 +422,49 @@ console.log(message.content);`
 
             <Button
               onClick={importToCCSwitch}
+              disabled={!hasApiKey}
               className="w-full gap-2 rounded-xl"
             >
               <ExternalLink className="h-4 w-4" />
               {isEn ? 'Import to CC Switch' : '导入到 CC Switch'}
             </Button>
 
-            <p className="text-xs text-muted-foreground text-center">
+            {!hasApiKey && (
+              <p className="text-xs text-amber-600 mt-2 text-center">
+                {isEn ? 'Please configure API Key in Proxy settings first' : '请先在代理设置中配置 API 密钥'}
+              </p>
+            )}
+
+            <p className="text-xs text-muted-foreground text-center mt-2">
               {isEn
-                ? 'Make sure CC Switch is installed before importing.'
-                : '导入前请确保已安装 CC Switch。'
+                ? (
+                  <>
+                    Make sure{' '}
+                    <a
+                      href="https://github.com/farion1231/cc-switch"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      CC Switch
+                    </a>
+                    {' '}is installed before importing.
+                  </>
+                )
+                : (
+                  <>
+                    导入前请确保已安装{' '}
+                    <a
+                      href="https://github.com/farion1231/cc-switch"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      CC Switch
+                    </a>
+                    。
+                  </>
+                )
               }
             </p>
           </div>

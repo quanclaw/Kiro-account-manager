@@ -1776,7 +1776,7 @@ app.whenReady().then(async () => {
   })
 
   // IPC: 手动检查更新（使用 GitHub API，用于 AboutPage）
-  const GITHUB_REPO = 'chaogei/Kiro-account-manager'
+  const GITHUB_REPO = 'ProTechPh/Kiro-account-manager'
   const GITHUB_API_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`
   
   ipcMain.handle('check-for-updates-manual', async () => {
@@ -4491,12 +4491,31 @@ app.whenReady().then(async () => {
       const config = proxyServer.getConfig()
       const port = config.port || 5580
       
+      // Get API key from config - support both legacy apiKey and new apiKeys array
+      let apiKey = 'dummy-key' // Default fallback
+      if (config.apiKeys && config.apiKeys.length > 0) {
+        // Use first enabled API key
+        const enabledKey = config.apiKeys.find(k => k.enabled !== false)
+        if (enabledKey) {
+          apiKey = enabledKey.key
+        }
+      } else if (config.apiKey) {
+        // Legacy single API key
+        apiKey = config.apiKey
+      }
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      
+      // Only add Authorization header if API key is configured
+      if (apiKey && apiKey !== 'dummy-key') {
+        headers['Authorization'] = `Bearer ${apiKey}`
+      }
+      
       const response = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer dummy-key'
-        },
+        headers,
         body: JSON.stringify({
           model: model,
           messages: messages,

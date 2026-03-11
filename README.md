@@ -71,17 +71,8 @@
 ### Account Management
 ![Account Management](resources/账户管理.png)
 
-### Machine ID Management
-![Machine ID Management](resources/机器码管理.png)
-
 ### Settings
 ![Settings](resources/设置.png)
-
-### Kiro IDE Settings
-![Kiro Settings](resources/Kiro%20设置.png)
-
-### Theme Colors
-![Theme Colors](resources/主题色.png)
 
 ### About
 ![About](resources/关于.png)
@@ -116,3 +107,44 @@ npm run typecheck
 ```
 
 ---
+
+## 📋 Changelog
+
+### v1.5.0
+
+**New Features:**
+- 🌐 **API Proxy Service**: OpenAI-compatible API gateway with automatic account rotation
+- 💬 **Chat Interface**: Built-in chat with conversation management and AI-powered title generation
+- 📊 **System Logs**: Real-time log streaming with color-coded severity levels
+- 📝 **API Examples**: Code examples and CC Switch integration for quick setup
+- 🎨 **Modern UI**: KiroaaS-inspired design with lime accent colors and improved dark mode
+
+**Improvements:**
+- Enhanced model selection with support for all Kiro native models
+- Improved API key handling in chat and proxy services
+- Better conversation persistence across app restarts
+- Updated repository references to ProTechPh organization
+
+**Bug Fixes:**
+- Fixed API key authentication in chat completion
+- Fixed model mapping to preserve native Kiro models
+- Improved error handling in proxy service
+
+---
+
+## 👨‍💻 Author
+
+- **GitHub**: [chaogei](https://github.com/ProTechPh)
+- **Project Homepage**: [Kiro-account-manager](https://github.com/ProTechPh/Kiro-account-manager)
+
+---
+
+## 📄 License
+
+This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## ⭐ Star History
+
+If this project helps you, please give it a star ⭐

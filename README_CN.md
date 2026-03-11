@@ -71,17 +71,8 @@
 ### 账户管理
 ![账户管理](resources/账户管理.png)
 
-### 机器码管理
-![机器码管理](resources/机器码管理.png)
-
 ### 设置
 ![设置](resources/设置.png)
-
-### Kiro IDE 设置
-![Kiro 设置](resources/Kiro%20设置.png)
-
-### 主题颜色
-![主题颜色](resources/主题色.png)
 
 ### 关于
 ![关于](resources/关于.png)
@@ -119,4 +110,41 @@ npm run typecheck
 
 ## 📋 更新日志
 
-查看 [根目录 README](../README_CN.md#-更新日志) 获取完整更新日志。
+### v1.5.0
+
+**新功能:**
+- 🌐 **API 反代服务**: OpenAI 兼容的 API 网关，支持自动账号轮换
+- 💬 **聊天界面**: 内置聊天功能，支持对话管理和 AI 智能标题生成
+- 📊 **系统日志**: 实时日志流，支持颜色分级显示
+- 📝 **API 示例**: 代码示例和 CC Switch 集成，快速配置
+- 🎨 **现代化界面**: KiroaaS 风格设计，青柠色强调色，改进的深色模式
+
+**改进:**
+- 增强模型选择，支持所有 Kiro 原生模型
+- 改进聊天和代理服务中的 API 密钥处理
+- 更好的对话持久化，支持应用重启后恢复
+- 更新仓库引用至 ProTechPh 组织
+
+**Bug 修复:**
+- 修复聊天完成中的 API 密钥认证问题
+- 修复模型映射以保留原生 Kiro 模型
+- 改进代理服务的错误处理
+
+---
+
+## 👨‍💻 作者
+
+- **GitHub**: [chaogei](https://github.com/ProTechPh)
+- **项目主页**: [Kiro-account-manager](https://github.com/ProTechPh/Kiro-account-manager)
+
+---
+
+## 📄 许可证
+
+本项目采用 AGPL-3.0 许可证 - 详见 [LICENSE](LICENSE) 文件
+
+---
+
+## ⭐ Star 历史
+
+如果这个项目对你有帮助，请给它一个 star ⭐

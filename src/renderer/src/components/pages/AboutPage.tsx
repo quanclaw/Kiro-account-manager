@@ -316,11 +316,27 @@ export function AboutPage() {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✓</span>
+              <strong>{isEn ? 'API Proxy Service' : 'API 反代服务'}</strong>{isEn ? ': OpenAI-compatible API gateway with auto account rotation' : '：OpenAI 兼容的 API 网关，支持自动账号轮换'}
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary mt-0.5">✓</span>
+              <strong>{isEn ? 'Chat Interface' : '聊天界面'}</strong>{isEn ? ': Built-in chat with conversation management and AI title generation' : '：内置聊天界面，支持对话管理和 AI 标题生成'}
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary mt-0.5">✓</span>
+              <strong>{isEn ? 'System Logs' : '系统日志'}</strong>{isEn ? ': Real-time log streaming with color-coded levels' : '：实时日志流，支持颜色分级显示'}
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary mt-0.5">✓</span>
+              <strong>{isEn ? 'API Examples' : 'API 示例'}</strong>{isEn ? ': Code examples and CC Switch integration for easy setup' : '：代码示例和 CC Switch 集成，快速配置'}
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary mt-0.5">✓</span>
               <strong>{isEn ? 'Proxy Support' : '代理支持'}</strong>{isEn ? ': HTTP/HTTPS/SOCKS5' : '：支持 HTTP/HTTPS/SOCKS5 代理'}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✓</span>
-              <strong>{isEn ? 'Themes' : '主题定制'}</strong>{isEn ? ': 21 colors, dark/light mode' : '：21 种主题颜色，深色/浅色模式'}
+              <strong>{isEn ? 'Themes' : '主题定制'}</strong>{isEn ? ': Dark/light mode with modern design' : '：深色/浅色模式，现代化设计'}
             </li>
           </ul>
         </CardContent>
@@ -365,13 +381,13 @@ export function AboutPage() {
             <div className="flex items-center gap-3">
               <img 
                 src={authorAvatar}
-                alt="chaogei666"
+                alt="ProTechPh"
                 className="w-10 h-10 rounded-full"
               />
-              <p className="font-medium">chaogei666</p>
+              <p className="font-medium">ProTechPh</p>
             </div>
             <a 
-              href="https://github.com/chaogei/Kiro-account-manager" 
+              href="https://github.com/ProTechPh/Kiro-account-manager" 
               target="_blank" 
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg hover:bg-muted"
