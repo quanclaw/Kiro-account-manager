@@ -77,7 +77,7 @@ const MODEL_ID_MAP: Record<string, string> = {
   'claude-3-opus': 'claude-sonnet-4.5',
   'claude-3-sonnet': 'claude-sonnet-4',
   'claude-3-haiku': 'claude-haiku-4.5',
-  'default': 'claude-sonnet-4.5'
+  'default': 'auto'
 }
 
 export function mapModelId(model: string): string {
