@@ -1099,7 +1099,7 @@ export async function fetchKiroModels(account: ProxyAccount): Promise<KiroModel[
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     'User-Agent': getKiroUserAgent(effectiveFingerprint),
-    'x-amz-user-agent': getKiroAmzUserAgent(account.fingerprint),
+    'x-amz-user-agent': getKiroAmzUserAgent(effectiveFingerprint),
     'x-amzn-codewhisperer-optout': 'true'
   }
 
@@ -1226,7 +1226,7 @@ export async function fetchSubscriptionToken(
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     'User-Agent': getKiroUserAgent(effectiveFingerprint),
-    'x-amz-user-agent': getKiroAmzUserAgent(account.fingerprint),
+    'x-amz-user-agent': getKiroAmzUserAgent(effectiveFingerprint),
     'x-amzn-codewhisperer-optout-preference': 'OPTIN'
   }
 

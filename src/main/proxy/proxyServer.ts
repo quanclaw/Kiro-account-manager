@@ -45,6 +45,7 @@ export class ProxyServer {
   private events: ProxyServerEvents
   private refreshingTokens: Set<string> = new Set() // 防止并发刷新
   private isHttps: boolean = false
+  private isClosing: boolean = false
 
   constructor(config: Partial<ProxyConfig> = {}, events: ProxyServerEvents = {}) {
     this.config = {
@@ -178,14 +179,26 @@ export class ProxyServer {
 
   // 停止服务器
   async stop(): Promise<void> {
-    if (!this.server) {
+    if (!this.server || this.isClosing) {
       return
     }
 
+    this.isClosing = true
+
     return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        // Force close after 5 seconds if connections don't close naturally
+        if (this.server) {
+          console.warn('[ProxyServer] Force closing server after timeout')
+          this.server.closeAllConnections?.()
+        }
+      }, 5000)
+
       this.server!.close(() => {
+        clearTimeout(timeout)
         proxyLogger.info('ProxyServer', 'Stopped')
         this.server = null
+        this.isClosing = false
         this.events.onStatusChange?.(false, this.config.port)
         resolve()
       })

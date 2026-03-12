@@ -1,20 +1,20 @@
 // Fingerprint/User-Agent helpers
 
+import { getMachineFingerprint } from './proxy/gatewayUtils'
+
 /**
- * Fingerprint auto-generation is disabled.
- * This function only returns the explicitly provided fingerprint.
+ * Generate the stable machine fingerprint used by kiro-gateway.
  */
 export function generateAccountFingerprint(_accountIdentifier: string, existingFingerprint?: string): string {
-  return existingFingerprint || ''
+  return existingFingerprint || getMachineFingerprint()
 }
 
 /**
- * Get existing fingerprint for an account.
- * Auto-generation is intentionally disabled.
+ * Get an existing account fingerprint or fall back to the stable machine fingerprint.
  */
 export function getOrGenerateFingerprint(accountEmail: string, existingFingerprint?: string): string {
   void accountEmail
-  return existingFingerprint || ''
+  return existingFingerprint || getMachineFingerprint()
 }
 
 /**
@@ -24,9 +24,6 @@ export function getKiroVersion(): string {
   return '0.7.45'
 }
 
-/**
- * No default fingerprint fallback.
- */
 /**
  * Build User-Agent header with account-specific fingerprint
  * Format: aws-sdk-js/1.0.27 ua/2.1 os/{platform} lang/js md/nodejs#{version} api/codewhispererstreaming#1.0.27 m/E KiroIDE-{version}-{fingerprint}

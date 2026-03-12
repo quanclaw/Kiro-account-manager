@@ -86,6 +86,7 @@ export function ProxyPanel() {
   const [recentLogs, setRecentLogs] = useState<Array<{ time: string; path: string; model?: string; status: number; tokens?: number; inputTokens?: number; outputTokens?: number; credits?: number; error?: string }>>([])
   const [isSyncing, setIsSyncing] = useState(false)
   const [isRefreshingModels, setIsRefreshingModels] = useState(false)
+  const [isStopping, setIsStopping] = useState(false)
   const [syncSuccess, setSyncSuccess] = useState(false)
   const [refreshSuccess, setRefreshSuccess] = useState(false)
   const [showLogsDialog, setShowLogsDialog] = useState(false)
@@ -231,7 +232,10 @@ export function ProxyPanel() {
 
   // 停止服务器
   const handleStop = async () => {
+    if (isStopping) return // Prevent multiple calls
+    
     setError(null)
+    setIsStopping(true)
     try {
       const result = await window.api.proxyStop()
       if (result.success) {
@@ -242,6 +246,8 @@ export function ProxyPanel() {
       }
     } catch (err) {
       setError((err as Error).message)
+    } finally {
+      setIsStopping(false)
     }
   }
 
@@ -423,9 +429,9 @@ export function ProxyPanel() {
                 {isEn ? 'Start Service' : '启动服务'}
               </Button>
             ) : (
-              <Button onClick={handleStop} variant="destructive" className="gap-2">
-                <Square className="h-4 w-4" />
-                {isEn ? 'Stop Service' : '停止服务'}
+              <Button onClick={handleStop} variant="destructive" className="gap-2" disabled={isStopping}>
+                {isStopping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
+                {isStopping ? (isEn ? 'Stopping...' : '停止中...') : (isEn ? 'Stop Service' : '停止服务')}
               </Button>
             )}
             <Button onClick={syncAccounts} variant="outline" className="gap-2" disabled={!isRunning || isSyncing}>

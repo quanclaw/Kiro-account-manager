@@ -109,7 +109,7 @@ function getFallbackRestApiBase(ssoRegion?: string): string {
 }
 
 function buildAccountFingerprint(_email?: string, _userId?: string, _refreshToken?: string): string | undefined {
-  return undefined
+  return getMachineFingerprint()
 }
 
 // API 类型配置
