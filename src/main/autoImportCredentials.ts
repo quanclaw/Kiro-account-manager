@@ -6,8 +6,7 @@
 
 import { readdir, readFile, access } from 'fs/promises'
 import { join } from 'path'
-import { homedir, hostname } from 'os'
-import { createHash } from 'crypto'
+import { homedir } from 'os'
 import Database from 'better-sqlite3'
 
 interface KiroAuthToken {
@@ -66,25 +65,6 @@ const SQLITE_REGISTRATION_KEYS = [
   'kirocli:odic:device-registration',
   'codewhisperer:odic:device-registration'
 ]
-
-/**
- * Generate device fingerprint (same as kiro-gateway)
- * Based on hostname + username only (not account-specific)
- */
-function generateDeviceFingerprint(): string {
-  try {
-    const hostName = hostname()
-    const userName = process.env.USERNAME || process.env.USER || 'unknown'
-    const uniqueString = `${hostName}-${userName}-kiro-gateway`
-    
-    const fingerprint = createHash('sha256').update(uniqueString).digest('hex')
-    console.log('[AutoImport] Generated device fingerprint:', fingerprint)
-    return fingerprint
-  } catch (error) {
-    console.error('[AutoImport] Failed to generate device fingerprint:', error)
-    return createHash('sha256').update('default-kiro-gateway').digest('hex')
-  }
-}
 
 /**
  * Get AWS SSO cache directory path
@@ -225,8 +205,7 @@ async function loadFromKiroCliSqlite(): Promise<ImportedCredentials | null> {
       expiresAt,
       authMethod: authMethod as 'IdC' | 'social',
       region: tokenData.region || registrationData?.region || 'us-east-1',
-      source: 'kiro-cli-sqlite',
-      fingerprint: generateDeviceFingerprint()
+      source: 'kiro-cli-sqlite'
     }
   } catch (error) {
     console.error('[AutoImport] Error loading from kiro-cli SQLite:', error)
@@ -269,8 +248,7 @@ async function loadFromKiroCredentialsFile(): Promise<ImportedCredentials | null
       authMethod: creds.authMethod || (creds.clientId ? 'IdC' : 'social'),
       provider: creds.provider,
       region: creds.region || 'us-east-1',
-      source: 'kiro-credentials-file',
-      fingerprint: generateDeviceFingerprint()
+      source: 'kiro-credentials-file'
     }
   } catch (error) {
     console.error('[AutoImport] Error loading from Kiro credentials file:', error)
@@ -321,8 +299,7 @@ async function scanSsoCache(): Promise<ImportedCredentials | null> {
           authMethod: token.authMethod || 'social',
           provider: token.provider,
           region: token.region || 'us-east-1',
-          source: 'aws-sso-cache',
-          fingerprint: generateDeviceFingerprint()
+          source: 'aws-sso-cache'
         }
       }
     }

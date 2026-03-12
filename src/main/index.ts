@@ -7,8 +7,9 @@ import { encode, decode } from 'cbor-x'
 import icon from '../../resources/icon.png?asset'
 import { ProxyServer, type ProxyAccount, type ProxyConfig } from './proxy'
 import { fetchKiroModels, fetchSubscriptionToken, fetchAvailableSubscriptions } from './proxy/kiroApi'
+import { getMachineFingerprint } from './proxy/gatewayUtils'
 import { proxyLogStore } from './proxy/logger'
-import { getKiroUserAgent, getKiroAmzUserAgent, getOrGenerateFingerprint } from './fingerprint'
+import { getKiroUserAgent, getKiroAmzUserAgent } from './fingerprint'
 import { autoTokenRefreshManager } from './autoTokenRefresh'
 import { autoImportCredentials } from './autoImportCredentials'
 import type { Account } from '../renderer/src/types/account'
@@ -107,9 +108,8 @@ function getFallbackRestApiBase(ssoRegion?: string): string {
     : KIRO_REST_API_ENDPOINTS['eu-central-1']
 }
 
-function buildAccountFingerprint(email?: string, userId?: string, refreshToken?: string): string {
-  const identifier = email || userId || (refreshToken ? `rt-${refreshToken.slice(0, 16)}` : 'unknown')
-  return getOrGenerateFingerprint(identifier)
+function buildAccountFingerprint(_email?: string, _userId?: string, _refreshToken?: string): string | undefined {
+  return undefined
 }
 
 // API 类型配置
@@ -484,11 +484,12 @@ async function refreshSocialToken(refreshToken: string): Promise<OidcRefreshResu
   const url = `${KIRO_AUTH_ENDPOINT}/refreshToken`
   
   try {
+    const fingerprint = getMachineFingerprint()
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': getKiroUserAgent()
+        'User-Agent': getKiroUserAgent(fingerprint)
       },
       body: JSON.stringify({ refreshToken })
     })
@@ -736,6 +737,7 @@ async function kiroApiRequest<T>(
   console.log(`[Kiro API] AccessToken (last 50 chars):`, accessToken?.substring(accessToken.length - 50))
   console.log(`[Kiro API] Idp:`, idp)
   
+  const fingerprint = getMachineFingerprint()
   // 使用标准 fetch
   const headers: Record<string, string> = {
     'accept': 'application/cbor',
@@ -743,7 +745,7 @@ async function kiroApiRequest<T>(
     'smithy-protocol': 'rpc-v2-cbor',
     'amz-sdk-invocation-id': generateInvocationId(),
     'amz-sdk-request': 'attempt=1; max=1',
-    'x-amz-user-agent': getKiroAmzUserAgent(),
+    'x-amz-user-agent': getKiroAmzUserAgent(fingerprint),
     'authorization': `Bearer ${accessToken}`,
     'cookie': `Idp=${idp}; AccessToken=${accessToken}`
   }
@@ -870,11 +872,16 @@ async function fetchRestApi(
   path: string,
   accessToken: string
 ): Promise<Response> {
+  const fingerprint = getMachineFingerprint()
   const headers: Record<string, string> = {
     'Accept': 'application/json',
     'Authorization': `Bearer ${accessToken}`,
-    'User-Agent': getKiroUserAgent(),
-    'x-amz-user-agent': getKiroAmzUserAgent()
+    'User-Agent': getKiroUserAgent(fingerprint),
+    'x-amz-user-agent': getKiroAmzUserAgent(fingerprint),
+    'x-amzn-codewhisperer-optout': 'true',
+    'x-amzn-kiro-agent-mode': 'vibe',
+    'amz-sdk-invocation-id': generateInvocationId(),
+    'amz-sdk-request': 'attempt=1; max=3'
   }
   const url = `${baseUrl}${path}`
   return await fetch(url, { method: 'GET', headers })

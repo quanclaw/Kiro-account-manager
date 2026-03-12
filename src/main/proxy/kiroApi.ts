@@ -1,6 +1,7 @@
 // Kiro API 调用核心模块
 import { v4 as uuidv4 } from 'uuid'
 import { getKiroUserAgent, getKiroAmzUserAgent } from '../fingerprint'
+import { getMachineFingerprint } from './gatewayUtils'
 import type {
   KiroPayload,
   KiroUserInputMessage,
@@ -421,16 +422,22 @@ export function buildKiroPayload(
   return payload
 }
 
+// 获取有效的指纹（账户指纹或机器指纹）
+function getEffectiveFingerprint(accountFingerprint?: string): string {
+  return accountFingerprint || getMachineFingerprint()
+}
+
 // 获取认证方式对应的请求头
 function getAuthHeaders(account: ProxyAccount, endpoint: typeof KIRO_ENDPOINTS[0]): Record<string, string> {
   const isIDC = account.authMethod === 'idc'
+  const effectiveFingerprint = getEffectiveFingerprint(account.fingerprint)
   
   return {
     'Content-Type': 'application/json',
     'Accept': '*/*',
     'X-Amz-Target': endpoint.amzTarget,
-    'User-Agent': isIDC ? KIRO_CLI_USER_AGENT : getKiroUserAgent(account.fingerprint),
-    'X-Amz-User-Agent': isIDC ? KIRO_CLI_AMZ_USER_AGENT : getKiroAmzUserAgent(account.fingerprint),
+    'User-Agent': isIDC ? KIRO_CLI_USER_AGENT : getKiroUserAgent(effectiveFingerprint),
+    'X-Amz-User-Agent': isIDC ? KIRO_CLI_AMZ_USER_AGENT : getKiroAmzUserAgent(effectiveFingerprint),
     'x-amzn-kiro-agent-mode': isIDC ? AGENT_MODE_VIBE : AGENT_MODE_SPEC,
     'x-amzn-codewhisperer-optout': 'true',
     'Amz-Sdk-Request': 'attempt=1; max=3',
@@ -1085,12 +1092,13 @@ function getQServiceEndpoint(region?: string): string {
 // 获取 Kiro 官方模型列表（支持分页，与官方插件一致传递 profileArn）
 export async function fetchKiroModels(account: ProxyAccount): Promise<KiroModel[]> {
   const baseUrl = getQServiceEndpoint(account.region)
+  const effectiveFingerprint = getEffectiveFingerprint(account.fingerprint)
   
   const headers: Record<string, string> = {
     'Authorization': `Bearer ${account.accessToken}`,
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'User-Agent': getKiroUserAgent(account.fingerprint),
+    'User-Agent': getKiroUserAgent(effectiveFingerprint),
     'x-amz-user-agent': getKiroAmzUserAgent(account.fingerprint),
     'x-amzn-codewhisperer-optout': 'true'
   }
@@ -1159,13 +1167,14 @@ export interface SubscriptionListResponse {
 export async function fetchAvailableSubscriptions(account: ProxyAccount): Promise<SubscriptionListResponse> {
   const baseUrl = getQServiceEndpoint(account.region)
   const url = `${baseUrl}/listAvailableSubscriptions`
+  const effectiveFingerprint = getEffectiveFingerprint(account.fingerprint)
   
   const headers: Record<string, string> = {
     'Authorization': `Bearer ${account.accessToken}`,
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'User-Agent': getKiroUserAgent(account.fingerprint),
-    'x-amz-user-agent': getKiroAmzUserAgent(account.fingerprint),
+    'User-Agent': getKiroUserAgent(effectiveFingerprint),
+    'x-amz-user-agent': getKiroAmzUserAgent(effectiveFingerprint),
     'x-amzn-codewhisperer-optout-preference': 'OPTIN'
   }
 
@@ -1210,12 +1219,13 @@ export async function fetchSubscriptionToken(
 ): Promise<SubscriptionTokenResponse> {
   const baseUrl = getQServiceEndpoint(account.region)
   const url = `${baseUrl}/CreateSubscriptionToken`
+  const effectiveFingerprint = getEffectiveFingerprint(account.fingerprint)
   
   const headers: Record<string, string> = {
     'Authorization': `Bearer ${account.accessToken}`,
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'User-Agent': getKiroUserAgent(account.fingerprint),
+    'User-Agent': getKiroUserAgent(effectiveFingerprint),
     'x-amz-user-agent': getKiroAmzUserAgent(account.fingerprint),
     'x-amzn-codewhisperer-optout-preference': 'OPTIN'
   }

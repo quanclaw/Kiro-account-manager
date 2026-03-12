@@ -1387,14 +1387,18 @@ export class ProxyServer {
         },
         (error) => {
           console.error('[ProxyServer] Stream error:', error)
-          res.write(`data: ${JSON.stringify({ error: { message: error.message } })}\n\n`)
+          const isQuotaError = this.isHighVolumeError(error.message)
+          const responseMessage = isQuotaError
+            ? 'try to change model just because high volume'
+            : error.message
+
+          res.write(`data: ${JSON.stringify({ error: { message: responseMessage } })}\n\n`)
           res.end()
 
           this.recordRequestFailed()
-          const isQuotaError = error.message.includes('429') || error.message.includes('quota')
           this.accountPool.recordError(account.id, isQuotaError)
-          this.events.onResponse?.({ path: '/v1/chat/completions', model, status: 500, error: error.message })
-          this.recordRequest({ path: '/v1/chat/completions', model, accountId: account.id, responseTime: Date.now() - startTime, success: false, error: error.message })
+          this.events.onResponse?.({ path: '/v1/chat/completions', model, status: 500, error: responseMessage })
+          this.recordRequest({ path: '/v1/chat/completions', model, accountId: account.id, responseTime: Date.now() - startTime, success: false, error: responseMessage })
           resolve()
         }
       )
@@ -1824,17 +1828,21 @@ export class ProxyServer {
         },
         (error) => {
           console.error('[ProxyServer] Stream error:', error)
+          const isQuotaError = this.isHighVolumeError(error.message)
+          const responseMessage = isQuotaError
+            ? 'try to change model just because high volume'
+            : error.message
+
           const errorEvent = createClaudeStreamEvent('error', {
-            error: { type: 'api_error', message: error.message }
+            error: { type: 'api_error', message: responseMessage }
           })
           res.write(`event: error\ndata: ${JSON.stringify(errorEvent)}\n\n`)
           res.end()
 
           this.recordRequestFailed()
-          const isQuotaError = error.message.includes('429') || error.message.includes('quota')
           this.accountPool.recordError(account.id, isQuotaError)
-          this.events.onResponse?.({ path: '/v1/messages', model, status: 500, error: error.message })
-          this.recordRequest({ path: '/v1/messages', model, accountId: account.id, responseTime: Date.now() - startTime, success: false, error: error.message })
+          this.events.onResponse?.({ path: '/v1/messages', model, status: 500, error: responseMessage })
+          this.recordRequest({ path: '/v1/messages', model, accountId: account.id, responseTime: Date.now() - startTime, success: false, error: responseMessage })
           resolve()
         }
       )
@@ -1844,8 +1852,11 @@ export class ProxyServer {
   // 处理 API 错误
   private handleApiError(res: http.ServerResponse, account: { id: string }, error: Error, path: string, model?: string, startTime?: number): void {
     this.recordRequestFailed()
-    const isQuotaError = error.message.includes('429') || error.message.includes('quota')
+    const isQuotaError = this.isHighVolumeError(error.message)
     const isAuthError = error.message.includes('401') || error.message.includes('403') || error.message.includes('Auth')
+    const responseMessage = isQuotaError
+      ? 'try to change model just because high volume'
+      : error.message
 
     this.accountPool.recordError(account.id, isQuotaError)
 
@@ -1853,9 +1864,19 @@ export class ProxyServer {
     if (isQuotaError) statusCode = 429
     if (isAuthError) statusCode = 401
 
-    this.sendError(res, statusCode, error.message)
-    this.events.onResponse?.({ path, status: statusCode, error: error.message })
-    this.recordRequest({ path, model, accountId: account.id, responseTime: startTime ? Date.now() - startTime : 0, success: false, error: error.message })
+    this.sendError(res, statusCode, responseMessage)
+    this.events.onResponse?.({ path, status: statusCode, error: responseMessage })
+    this.recordRequest({ path, model, accountId: account.id, responseTime: startTime ? Date.now() - startTime : 0, success: false, error: responseMessage })
+  }
+
+  private isHighVolumeError(message: string): boolean {
+    const normalized = message.toLowerCase()
+    return normalized.includes('429')
+      || normalized.includes('quota')
+      || normalized.includes('throttlingexception')
+      || normalized.includes('reached the limit')
+      || normalized.includes('high volume')
+      || normalized.includes('too many requests')
   }
 
   // 读取请求体
