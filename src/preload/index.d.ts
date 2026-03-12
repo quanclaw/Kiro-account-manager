@@ -196,6 +196,7 @@ interface KiroApi {
       userId: string
       accessToken: string
       refreshToken: string
+      fingerprint?: string
       expiresIn?: number
       subscriptionType: string
       subscriptionTitle: string
@@ -271,6 +272,7 @@ interface KiroApi {
       expiresIn?: number
       email?: string
       userId?: string
+      fingerprint?: string
       idp?: string
       status?: string
       subscriptionType?: string

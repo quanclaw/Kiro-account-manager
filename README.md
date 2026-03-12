@@ -110,6 +110,15 @@ npm run typecheck
 
 ## 📋 Changelog
 
+### v1.5.5
+
+**Bug Fixes:**
+- 🧬 **OAuth Fingerprint Auto-Generate**: Fixed missing fingerprint when adding accounts via social OAuth login
+- 🔄 **Consistent Fingerprint Pipeline**: Unified fingerprint return in verify/import handlers for OAuth, SSO, and credential flows
+- 🗂️ **Reliable Persistence**: Add-account paths now save fingerprint consistently for single and batch imports
+
+See full details: `docs/CHANGELOG-v1.5.5.md`
+
 ### v1.5.2
 
 **Improvements:**

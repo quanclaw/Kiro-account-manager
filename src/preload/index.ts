@@ -170,6 +170,7 @@ const api = {
       userId: string
       accessToken: string
       refreshToken: string
+      fingerprint?: string
       expiresIn?: number
       subscriptionType: string
       subscriptionTitle: string
@@ -225,6 +226,7 @@ const api = {
       expiresIn?: number
       email?: string
       userId?: string
+      fingerprint?: string
       idp?: string
       status?: string
     }

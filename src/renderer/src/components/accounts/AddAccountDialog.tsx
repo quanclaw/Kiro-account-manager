@@ -24,6 +24,7 @@ interface VerifiedData {
   accessToken: string
   refreshToken: string
   expiresIn?: number
+  fingerprint?: string
   subscriptionType: string
   subscriptionTitle: string
   subscription?: {
@@ -254,7 +255,8 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
           groupId: undefined,
           tags: [],
           status: 'active',
-          lastUsedAt: now
+          lastUsedAt: now,
+          fingerprint: result.data.fingerprint
         })
 
         resetForm()
@@ -582,7 +584,8 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
             groupId: undefined,
             tags: [],
             status: 'active',
-            lastUsedAt: now
+            lastUsedAt: now,
+            fingerprint: result.data.fingerprint
           })
           
           importResult.success++
@@ -762,7 +765,8 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
             groupId: undefined,
             tags: [],
             status: 'active',
-            lastUsedAt: now
+            lastUsedAt: now,
+            fingerprint: result.data.fingerprint
           })
           
           importResult.success++
@@ -899,7 +903,8 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
           groupId: undefined,
           tags: [],
           status: 'active',
-          lastUsedAt: now
+          lastUsedAt: now,
+          fingerprint: result.data.fingerprint
         })
 
         resetForm()

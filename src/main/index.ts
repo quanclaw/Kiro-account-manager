@@ -8,7 +8,7 @@ import icon from '../../resources/icon.png?asset'
 import { ProxyServer, type ProxyAccount, type ProxyConfig } from './proxy'
 import { fetchKiroModels, fetchSubscriptionToken, fetchAvailableSubscriptions } from './proxy/kiroApi'
 import { proxyLogStore } from './proxy/logger'
-import { getKiroUserAgent, getKiroAmzUserAgent } from './fingerprint'
+import { getKiroUserAgent, getKiroAmzUserAgent, getOrGenerateFingerprint } from './fingerprint'
 import { autoTokenRefreshManager } from './autoTokenRefresh'
 import { autoImportCredentials } from './autoImportCredentials'
 import type { Account } from '../renderer/src/types/account'
@@ -105,6 +105,11 @@ function getFallbackRestApiBase(ssoRegion?: string): string {
   return primary === KIRO_REST_API_ENDPOINTS['eu-central-1']
     ? KIRO_REST_API_ENDPOINTS['us-east-1']
     : KIRO_REST_API_ENDPOINTS['eu-central-1']
+}
+
+function buildAccountFingerprint(email?: string, userId?: string, refreshToken?: string): string {
+  const identifier = email || userId || (refreshToken ? `rt-${refreshToken.slice(0, 16)}` : 'unknown')
+  return getOrGenerateFingerprint(identifier)
 }
 
 // API 类型配置
@@ -2138,6 +2143,9 @@ app.whenReady().then(async () => {
 
       const totalLimit = baseLimit + freeTrialLimit + bonuses.reduce((s, b) => s + b.limit, 0)
       const totalCurrent = baseCurrent + freeTrialCurrent + bonuses.reduce((s, b) => s + b.current, 0)
+      const accountEmail = usageData?.userInfo?.email || userInfo?.email
+      const accountUserId = usageData?.userInfo?.userId || userInfo?.userId
+      const fingerprint = buildAccountFingerprint(accountEmail, accountUserId, ssoResult.refreshToken)
 
       return {
         success: true,
@@ -2148,10 +2156,11 @@ app.whenReady().then(async () => {
           clientSecret: ssoResult.clientSecret,
           region: ssoResult.region,
           expiresIn: ssoResult.expiresIn,
-          email: usageData?.userInfo?.email || userInfo?.email,
-          userId: usageData?.userInfo?.userId || userInfo?.userId,
+          email: accountEmail,
+          userId: accountUserId,
           idp: userInfo?.idp || 'BuilderId',
           status: userInfo?.status,
+          fingerprint,
           subscriptionType,
           subscriptionTitle,
           subscription: {
@@ -3165,6 +3174,7 @@ app.whenReady().then(async () => {
       // 解析用户信息
       const email = usageResult.userInfo?.email || ''
       const userId = usageResult.userInfo?.userId || ''
+      const fingerprint = buildAccountFingerprint(email, userId, refreshResult.refreshToken || refreshToken)
       
       // 解析订阅类型（注意检查顺序：先检查更具体的类型）
       const subscriptionTitle = usageResult.subscriptionInfo?.subscriptionTitle || 'Free'
@@ -3237,6 +3247,7 @@ app.whenReady().then(async () => {
           userId,
           accessToken: refreshResult.accessToken,
           refreshToken: refreshResult.refreshToken || refreshToken,
+          fingerprint,
           expiresIn: refreshResult.expiresIn,
           subscriptionType,
           subscriptionTitle,
