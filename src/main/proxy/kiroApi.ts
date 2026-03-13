@@ -156,11 +156,11 @@ export function injectSystemPrompts(
 
 // 占位消息
 const HELLO_MESSAGE: KiroHistoryMessage = {
-  userInputMessage: { content: 'Hello', origin: 'AI_EDITOR' }
+  userInputMessage: { content: 'Hello', modelId: 'auto', origin: 'AI_EDITOR' }
 }
 
 const CONTINUE_MESSAGE: KiroHistoryMessage = {
-  userInputMessage: { content: 'Continue', origin: 'AI_EDITOR' }
+  userInputMessage: { content: 'Continue', modelId: 'auto', origin: 'AI_EDITOR' }
 }
 
 const UNDERSTOOD_MESSAGE: KiroHistoryMessage = {
@@ -172,6 +172,7 @@ function createFailedToolUseMessage(toolUseIds: string[]): KiroHistoryMessage {
   return {
     userInputMessage: {
       content: '',
+      modelId: 'auto',
       origin: 'AI_EDITOR',
       userInputMessageContext: {
         toolResults: toolUseIds.map(toolUseId => ({
@@ -371,6 +372,12 @@ export function buildKiroPayload(
         origin
       }
     }
+  }
+  
+  // 确保 modelId 和 origin 存在于最终消息中
+  if (finalCurrentMessage.userInputMessage) {
+    finalCurrentMessage.userInputMessage.modelId = modelId
+    finalCurrentMessage.userInputMessage.origin = origin
   }
   
   // 确保 currentMessage 包含 tools

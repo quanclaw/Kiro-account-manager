@@ -169,7 +169,7 @@ export interface KiroCurrentMessage {
 
 export interface KiroUserInputMessage {
   content: string
-  modelId?: string  // 可选，占位消息不需要
+  modelId: string  // Required field for API validation
   origin: string
   images?: KiroImage[]
   userInputMessageContext?: KiroUserInputMessageContext
