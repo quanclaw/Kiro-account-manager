@@ -166,14 +166,14 @@ export function openaiToKiro(
     }
   }
 
-  // 如果最后一条是 assistant 消息，自动发送 Continue（参考 Proxycast）
-  if (history.length > 0 && history[history.length - 1].assistantResponseMessage && !currentContent) {
-    currentContent = 'Continue.'
-  }
-
   // 如果没有当前内容但有工具结果（最后一轮的），保留它们传给 currentMessage
   if (!currentContent && toolResults.length > 0) {
     currentContent = 'Tool results provided.'
+  }
+
+  // 如果最后一条是 assistant 消息，且没有用户输入与工具结果，再发送 Continue
+  if (history.length > 0 && history[history.length - 1].assistantResponseMessage && !currentContent) {
+    currentContent = 'Continue.'
   }
 
   // 如果 system prompt 还未合并（没有 user 消息），直接作为 currentContent

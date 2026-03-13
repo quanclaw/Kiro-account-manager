@@ -607,6 +607,41 @@ interface ToolUseState {
   inputBuffer: string
 }
 
+const MAX_TOOL_INPUT_BUFFER_CHARS = 2 * 1024 * 1024
+
+function finalizeToolUseState(
+  state: ToolUseState,
+  onChunk: (text: string, toolUse?: KiroToolUse, isThinking?: boolean) => void
+): void {
+  let finalInput: Record<string, unknown> = {}
+  let parseError = false
+
+  try {
+    if (state.inputBuffer) {
+      proxyLogger.debug('Kiro', 'Tool input buffer: ' + state.inputBuffer.substring(0, 200))
+      finalInput = JSON.parse(state.inputBuffer)
+      proxyLogger.debug('Kiro', 'Parsed tool input: ' + JSON.stringify(finalInput).substring(0, 200))
+    }
+  } catch (e) {
+    parseError = true
+    console.error('[Kiro] Failed to parse tool input:', e, 'Buffer:', state.inputBuffer?.substring(0, 100))
+    finalInput = {
+      _error: 'Tool input truncated or malformed in Kiro stream',
+      _partialInput: state.inputBuffer?.substring(0, 500) || ''
+    }
+  }
+
+  onChunk('', {
+    toolUseId: state.toolUseId,
+    name: state.name,
+    input: finalInput
+  })
+
+  if (parseError) {
+    onChunk(`\n\n⚠️ Tool "${state.name}" input was truncated or malformed in Kiro stream.`)
+  }
+}
+
 // 解析 AWS Event Stream 二进制格式
 async function parseEventStream(
   body: ReadableStream<Uint8Array>,
@@ -635,8 +670,8 @@ async function parseEventStream(
     usage.inputTokens = Math.max(1, Math.round(inputChars / 3))
   }
   
-  // Tool use 状态跟踪 - 用于累积输入片段
-  let currentToolUse: ToolUseState | null = null
+  // Tool use 状态跟踪 - 按 toolUseId 处理，避免片段流/重复 stop 导致逻辑异常
+  const toolUseStates = new Map<string, ToolUseState>()
   const processedIds = new Set<string>()
 
   try {
@@ -713,85 +748,45 @@ async function parseEventStream(
                 inputObj = toolUseData.input
               }
               
-              // 新的 tool use 开始
-              if (toolUseId && toolName) {
-                if (currentToolUse && currentToolUse.toolUseId !== toolUseId) {
-                  // 前一个 tool use 被中断，完成它
-                  if (!processedIds.has(currentToolUse.toolUseId)) {
-                    let finalInput: Record<string, unknown> = {}
-                    try {
-                      if (currentToolUse.inputBuffer) {
-                        finalInput = JSON.parse(currentToolUse.inputBuffer)
-                      }
-                    } catch { /* 忽略解析错误 */ }
-                    onChunk('', {
-                      toolUseId: currentToolUse.toolUseId,
-                      name: currentToolUse.name,
-                      input: finalInput
-                    })
-                    processedIds.add(currentToolUse.toolUseId)
-                  }
-                  currentToolUse = null
-                }
-                
-                if (!currentToolUse) {
-                  if (processedIds.has(toolUseId)) {
-                    // 跳过重复的 tool use
-                  } else {
-                    currentToolUse = {
+              if (toolUseId && processedIds.has(toolUseId)) {
+                // 已完成的 tool use 可能会收到重复片段/stop，直接忽略
+              } else {
+                let state: ToolUseState | undefined
+
+                if (toolUseId) {
+                  state = toolUseStates.get(toolUseId)
+                  if (!state && toolName) {
+                    state = {
                       toolUseId,
                       name: toolName,
                       inputBuffer: ''
                     }
+                    toolUseStates.set(toolUseId, state)
                   }
                 }
-              }
-              
-              // 累积输入片段
-              if (currentToolUse && inputFragment) {
-                currentToolUse.inputBuffer += inputFragment
-              }
-              
-              // 如果直接提供了完整输入对象
-              if (currentToolUse && inputObj) {
-                currentToolUse.inputBuffer = JSON.stringify(inputObj)
-              }
-              
-              // Tool use 完成
-              if (isStop && currentToolUse) {
-                let finalInput: Record<string, unknown> = {}
-                let parseError = false
-                try {
-                  if (currentToolUse.inputBuffer) {
-                    proxyLogger.debug('Kiro', 'Tool input buffer: ' + currentToolUse.inputBuffer.substring(0, 200))
-                    finalInput = JSON.parse(currentToolUse.inputBuffer)
-                    proxyLogger.debug('Kiro', 'Parsed tool input: ' + JSON.stringify(finalInput).substring(0, 200))
+
+                if (state) {
+                  if (inputFragment) {
+                    if (state.inputBuffer.length + inputFragment.length <= MAX_TOOL_INPUT_BUFFER_CHARS) {
+                      state.inputBuffer += inputFragment
+                    } else {
+                      state.inputBuffer = state.inputBuffer.substring(0, MAX_TOOL_INPUT_BUFFER_CHARS)
+                    }
                   }
-                } catch (e) {
-                  parseError = true
-                  console.error('[Kiro] Failed to parse tool input:', e, 'Buffer:', currentToolUse.inputBuffer?.substring(0, 100))
-                  // 当 JSON 解析失败时，创建一个包含错误信息的 input
-                  // 这样客户端可以看到工具调用失败的原因
-                  finalInput = {
-                    _error: 'Tool input truncated by Kiro API (output token limit exceeded)',
-                    _partialInput: currentToolUse.inputBuffer?.substring(0, 500) || ''
+
+                  if (inputObj) {
+                    const serialized = JSON.stringify(inputObj)
+                    state.inputBuffer = serialized.length <= MAX_TOOL_INPUT_BUFFER_CHARS
+                      ? serialized
+                      : serialized.substring(0, MAX_TOOL_INPUT_BUFFER_CHARS)
+                  }
+
+                  if (isStop) {
+                    finalizeToolUseState(state, onChunk)
+                    processedIds.add(state.toolUseId)
+                    toolUseStates.delete(state.toolUseId)
                   }
                 }
-                
-                // 只有在成功解析或有错误信息时才发送
-                onChunk('', {
-                  toolUseId: currentToolUse.toolUseId,
-                  name: currentToolUse.name,
-                  input: finalInput
-                })
-                
-                // 如果解析失败，额外发送一条文本消息告知用户
-                if (parseError) {
-                  onChunk(`\n\n⚠️ Tool "${currentToolUse.name}" input was truncated by Kiro API. The output may be incomplete due to token limits.`)
-                }
-                
-                processedIds.add(currentToolUse.toolUseId)
-                currentToolUse = null
               }
             }
             
@@ -845,8 +840,15 @@ async function parseEventStream(
               if (metadata.outputTokens) usage.outputTokens = metadata.outputTokens
             }
             
-            // 调试：打印所有事件类型（包括常见类型）
-            proxyLogger.debug('Kiro', 'Event: ' + (eventType || 'unknown'), JSON.stringify(event).slice(0, 500))
+            // 调试：避免 toolUseEvent 输入片段刷屏
+            const isToolInputFragment = (
+              (eventType === 'toolUseEvent' || event.toolUseEvent) &&
+              typeof (event.toolUseEvent || event).input === 'string' &&
+              !(event.toolUseEvent || event).stop
+            )
+            if (!isToolInputFragment) {
+              proxyLogger.debug('Kiro', 'Event: ' + (eventType || 'unknown'), JSON.stringify(event).slice(0, 500))
+            }
             
             // 处理 usageEvent
             if (eventType === 'usageEvent' || eventType === 'usage' || event.usageEvent || event.usage) {
@@ -1011,18 +1013,10 @@ async function parseEventStream(
     }
     
     // 完成任何未完成的 tool use
-    if (currentToolUse && !processedIds.has(currentToolUse.toolUseId)) {
-      let finalInput: Record<string, unknown> = {}
-      try {
-        if (currentToolUse.inputBuffer) {
-          finalInput = JSON.parse(currentToolUse.inputBuffer)
-        }
-      } catch { /* 忽略解析错误 */ }
-      onChunk('', {
-        toolUseId: currentToolUse.toolUseId,
-        name: currentToolUse.name,
-        input: finalInput
-      })
+    for (const [toolUseId, state] of toolUseStates) {
+      if (!processedIds.has(toolUseId)) {
+        finalizeToolUseState(state, onChunk)
+      }
     }
     
     // 如果 API 没有返回 token 信息，基于输出字符长度估算

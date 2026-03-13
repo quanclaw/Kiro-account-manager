@@ -12,7 +12,7 @@ import type {
   TokenRefreshCallback
 } from './types'
 import { AccountPool } from './accountPool'
-import { callKiroApiStream, callKiroApi, fetchKiroModels, buildKiroPayload, type KiroModel } from './kiroApi'
+import { callKiroApiStream, callKiroApi, fetchKiroModels, type KiroModel } from './kiroApi'
 import { proxyLogger } from './logger'
 import {
   openaiToKiro,
@@ -46,6 +46,16 @@ export class ProxyServer {
   private refreshingTokens: Set<string> = new Set() // 防止并发刷新
   private isHttps: boolean = false
   private isClosing: boolean = false
+  private recentClientCancelUntil = 0
+
+  private markRecentClientCancel(): void {
+    // 短暂阻断后续自动请求，确保用户点停止后链路真正停下
+    this.recentClientCancelUntil = Date.now() + 8000
+  }
+
+  private isWithinRecentClientCancelWindow(): boolean {
+    return Date.now() < this.recentClientCancelUntil
+  }
 
   constructor(config: Partial<ProxyConfig> = {}, events: ProxyServerEvents = {}) {
     this.config = {
@@ -751,6 +761,19 @@ export class ProxyServer {
     try {
       // 路由（移除查询参数）
       const pathWithoutQuery = path.split('?')[0]
+
+      // 用户在 IDE 点击停止后，短时间阻断自动后续请求，防止链路继续运行
+      if (
+        (pathWithoutQuery === '/v1/chat/completions' ||
+          pathWithoutQuery === '/chat/completions' ||
+          pathWithoutQuery === '/v1/messages' ||
+          pathWithoutQuery === '/messages' ||
+          pathWithoutQuery === '/anthropic/v1/messages') &&
+        this.isWithinRecentClientCancelWindow()
+      ) {
+        this.sendError(res, 499, 'Request cancelled by user stop action')
+        return
+      }
       
       if (pathWithoutQuery === '/v1/models' || pathWithoutQuery === '/models') {
         await this.handleModels(res)
@@ -1085,8 +1108,42 @@ export class ProxyServer {
       }
 
       if (request.stream) {
+        const streamAbortController = new AbortController()
+        const abortStream = () => {
+          if (!streamAbortController.signal.aborted) {
+            streamAbortController.abort()
+          }
+        }
+        req.once('aborted', () => {
+          this.markRecentClientCancel()
+          abortStream()
+        })
+        req.once('close', () => {
+          if (req.aborted) {
+            this.markRecentClientCancel()
+          }
+          abortStream()
+        })
+        res.once('close', () => {
+          if (!res.writableEnded) {
+            this.markRecentClientCancel()
+          }
+          abortStream()
+        })
+
         // 流式响应（流式不使用重试机制，错误由流处理）
-        await this.handleOpenAIStream(res, account, kiroPayload, request.model, startTime, 0, undefined, false, matchedApiKey)
+        await this.handleOpenAIStream(
+          res,
+          account,
+          kiroPayload,
+          request.model,
+          startTime,
+          0,
+          undefined,
+          false,
+          matchedApiKey,
+          streamAbortController.signal
+        )
       } else {
         // 非流式响应（带重试机制）
         const { result, account: usedAccount } = await this.callWithRetry(
@@ -1123,20 +1180,27 @@ export class ProxyServer {
       kiroPayload: any,
       model: string,
       startTime: number,
-      currentRound: number = 0,
+      _currentRound: number = 0,
       id?: string,
       isContinuation: boolean = false,
-      matchedApiKey?: import('./types').ApiKey
+      matchedApiKey?: import('./types').ApiKey,
+      abortSignal?: AbortSignal
     ): Promise<void> {
       return new Promise((resolve) => {
         let collectedContent = ''
         let pendingToolCalls = new Map<string, { name: string; arguments: string }>()
         let hasStarted = false
 
+        const isStreamClosed = (): boolean => {
+          return Boolean(abortSignal?.aborted || res.writableEnded || res.destroyed)
+        }
+
         callKiroApiStream(
           account,
           kiroPayload,
           (text: string, toolUse?: any, isThinking?: boolean) => {
+            if (isStreamClosed()) return
+
             if (!hasStarted) {
               hasStarted = true
               if (!isContinuation) {
@@ -1178,6 +1242,11 @@ export class ProxyServer {
             }
           },
           async (usage) => {
+            if (isStreamClosed()) {
+              resolve()
+              return
+            }
+
             this.recordRequestSuccess()
             this.stats.totalTokens += usage.inputTokens + usage.outputTokens
             this.stats.inputTokens += usage.inputTokens
@@ -1189,72 +1258,13 @@ export class ProxyServer {
               this.recordApiKeyUsage(matchedApiKey.id, usage.credits || 0, usage.inputTokens, usage.outputTokens, model, '/v1/chat/completions')
             }
 
-            // 检查是否需要自动继续
-            const maxRounds = this.config.autoContinueRounds || 0
             const hasToolCalls = pendingToolCalls.size > 0
-            
-            // 检查是否有 task_complete 工具调用（不应该自动继续）
-            const hasTaskComplete = Array.from(pendingToolCalls.values()).some(tool => tool.name === 'task_complete')
-            const shouldContinue = hasToolCalls && !hasTaskComplete && maxRounds > 0 && currentRound < maxRounds
+            if (hasToolCalls) {
+              proxyLogger.info('ProxyServer', 'Single-pass stream mode active', {
+                tools: Array.from(pendingToolCalls.values()).map((tool) => tool.name)
+              })
+            }
 
-            if (shouldContinue) {
-              console.log(`[ProxyServer] Auto-continue round ${currentRound + 1}/${maxRounds}`)
-
-              // 构造继续请求：添加 assistant 响应、工具结果和继续消息
-              const toolResults = Array.from(pendingToolCalls.entries()).map(([toolId, toolData]) => ({
-                toolUseId: toolId,
-                content: [{ text: this.executeToolLocally(toolData.name, JSON.parse(toolData.arguments)) }],
-                status: 'success' as const
-              }))
-
-              // 获取原始消息的 modelId 和 origin
-              const originalMsg = kiroPayload.conversationState?.currentMessage?.userInputMessage
-              const modelId = originalMsg?.modelId || 'claude-sonnet-4'
-              const origin = originalMsg?.origin || 'AI_EDITOR'
-
-              // 构建历史消息
-              const newHistory: any[] = [
-                ...(kiroPayload.conversationState?.history || []),
-                // 添加 assistant 响应
-                {
-                  assistantResponseMessage: {
-                    content: collectedContent || 'I will continue with the task.',
-                    ...(pendingToolCalls.size > 0 ? {
-                      toolUses: Array.from(pendingToolCalls.entries()).map(([toolId, toolData]) => ({
-                        toolUseId: toolId,
-                        name: toolData.name,
-                        input: JSON.parse(toolData.arguments)
-                      }))
-                    } : {})
-                  }
-                }
-              ]
-
-              // 使用 buildKiroPayload 构造正确的 payload
-              const originalTools = kiroPayload.conversationState?.currentMessage?.userInputMessage?.userInputMessageContext?.tools || []
-              const continuePayload = buildKiroPayload(
-                'Continue.',
-                modelId,
-                origin,
-                newHistory,
-                originalTools,
-                toolResults, // 工具结果
-                [], // 不需要 images
-                account.profileArn
-              )
-
-              // 递归调用继续流式输出
-              try {
-                await this.handleOpenAIStream(res, account, continuePayload, model, startTime, currentRound + 1, id, true)
-              } catch (error) {
-                console.error('[ProxyServer] Auto-continue error:', error)
-                // 在流式模式下，发送错误 chunk 而不是尝试设置 headers
-                const errorChunk = createOpenaiStreamChunk(id || uuidv4(), model, { role: 'assistant', content: `\n\n[Auto-continue failed: ${(error as Error).message}]` }, 'stop')
-                res.write(`data: ${JSON.stringify(errorChunk)}\n\n`)
-                res.write('data: [DONE]\n\n')
-              }
-              resolve()
-            } else {
               // 发送结束 chunk（包含完整 usage 信息）
               const finishReason = hasToolCalls ? 'tool_calls' : 'stop'
               const usageInfo = {
@@ -1268,6 +1278,7 @@ export class ProxyServer {
               const finalChunk = createOpenaiStreamChunk(id || uuidv4(), model, { role: 'assistant' }, finishReason, usageInfo)
               res.write(`data: ${JSON.stringify(finalChunk)}\n\n`)
               res.write('data: [DONE]\n\n')
+              res.end()
 
               const responseTime = Date.now() - startTime
               this.events.onResponse?.({
@@ -1292,9 +1303,13 @@ export class ProxyServer {
               })
 
               resolve()
-            }
           },
           (error) => {
+            if (isStreamClosed()) {
+              resolve()
+              return
+            }
+
             this.recordRequestFailed()
             console.error('[ProxyServer] Stream error:', error)
 
@@ -1305,6 +1320,7 @@ export class ProxyServer {
               const errorChunk = createOpenaiStreamChunk(id || uuidv4(), model, { role: 'assistant' }, 'stop')
               res.write(`data: ${JSON.stringify(errorChunk)}\n\n`)
               res.write('data: [DONE]\n\n')
+              res.end()
             }
 
             const responseTime = Date.now() - startTime
@@ -1328,7 +1344,7 @@ export class ProxyServer {
 
             resolve()
           },
-          undefined,
+          abortSignal,
           this.config.preferredEndpoint
         )
       })
@@ -1397,8 +1413,43 @@ export class ProxyServer {
       }
 
       if (request.stream) {
+        const streamAbortController = new AbortController()
+        const abortStream = () => {
+          if (!streamAbortController.signal.aborted) {
+            streamAbortController.abort()
+          }
+        }
+        req.once('aborted', () => {
+          this.markRecentClientCancel()
+          abortStream()
+        })
+        req.once('close', () => {
+          if (req.aborted) {
+            this.markRecentClientCancel()
+          }
+          abortStream()
+        })
+        res.once('close', () => {
+          if (!res.writableEnded) {
+            this.markRecentClientCancel()
+          }
+          abortStream()
+        })
+
         // 流式响应（流式不使用重试机制，错误由流处理）
-        await this.handleClaudeStream(res, account, kiroPayload, request.model, startTime, 0, undefined, false, 0, matchedApiKey)
+        await this.handleClaudeStream(
+          res,
+          account,
+          kiroPayload,
+          request.model,
+          startTime,
+          0,
+          undefined,
+          false,
+          0,
+          matchedApiKey,
+          streamAbortController.signal
+        )
       } else {
         // 非流式响应（带重试机制）
         const { result, account: usedAccount } = await this.callWithRetry(
@@ -1435,8 +1486,17 @@ export class ProxyServer {
     msgId?: string,
     headersSent: boolean = false,
     contentBlockIndex: number = 0,
-    matchedApiKey?: import('./types').ApiKey
+    matchedApiKey?: import('./types').ApiKey,
+    abortSignal?: AbortSignal
   ): Promise<void> {
+    const isStreamClosed = (): boolean => {
+      return Boolean(abortSignal?.aborted || res.writableEnded || res.destroyed)
+    }
+
+    if (isStreamClosed()) {
+      return
+    }
+
     if (!headersSent) {
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -1599,6 +1659,8 @@ export class ProxyServer {
         account as any,
         kiroPayload,
         (text, toolUse, isThinking) => {
+          if (isStreamClosed()) return
+
           if (text) {
             if (isThinking) {
               // reasoningContentEvent 的思考内容
@@ -1658,6 +1720,11 @@ export class ProxyServer {
           }
         },
         async (usage) => {
+          if (isStreamClosed()) {
+            resolve()
+            return
+          }
+
           // 刷新缓冲区中剩余的内容
           processClaudeText('', true)
           
@@ -1683,74 +1750,13 @@ export class ProxyServer {
             this.recordApiKeyUsage(matchedApiKey.id, usage.credits || 0, usage.inputTokens, usage.outputTokens, model, '/v1/messages')
           }
 
-          // 检查是否需要自动继续
-          const maxRounds = this.config.autoContinueRounds || 0
           const hasToolCalls = pendingToolCalls.size > 0
-          
-          // 检查是否有 task_complete 工具调用（不应该自动继续）
-          const hasTaskComplete = Array.from(pendingToolCalls.values()).some(tool => tool.name === 'task_complete')
-          const shouldContinue = hasToolCalls && !hasTaskComplete && maxRounds > 0 && currentRound < maxRounds
-
-          if (shouldContinue) {
-            console.log(`[ProxyServer] Claude auto-continue round ${currentRound + 1}/${maxRounds}`)
-            
-            // 构造继续请求
-            const toolResults = Array.from(pendingToolCalls.entries()).map(([toolId, toolData]) => ({
-              toolUseId: toolId,
-              content: [{ text: this.executeToolLocally(toolData.name, toolData.input) }],
-              status: 'success' as const
-            }))
-
-            const originalMsg = kiroPayload.conversationState?.currentMessage?.userInputMessage
-            const modelId = originalMsg?.modelId || 'claude-sonnet-4'
-            const origin = originalMsg?.origin || 'AI_EDITOR'
-
-            // 构建历史消息
-            const newHistory: any[] = [
-              ...(kiroPayload.conversationState?.history || []),
-              {
-                assistantResponseMessage: {
-                  content: collectedContent || 'I will continue with the task.',
-                  ...(pendingToolCalls.size > 0 ? {
-                    toolUses: Array.from(pendingToolCalls.entries()).map(([toolId, toolData]) => ({
-                      toolUseId: toolId,
-                      name: toolData.name,
-                      input: toolData.input
-                    }))
-                  } : {})
-                }
-              }
-            ]
-
-            // 使用 buildKiroPayload 构造正确的 payload
-            const originalTools = kiroPayload.conversationState?.currentMessage?.userInputMessage?.userInputMessageContext?.tools || []
-            const continuePayload = buildKiroPayload(
-              'Continue.',
-              modelId,
-              origin,
-              newHistory,
-              originalTools,
-              toolResults, // 工具结果
-              [], // 不需要 images
-              account.profileArn
-            )
-
-            // 调试：打印 auto-continue payload 信息
-            console.log('[ProxyServer] Auto-continue payload debug:', {
-              modelId,
-              origin,
-              historyLength: newHistory.length,
-              toolResultsCount: toolResults.length,
-              payloadSize: JSON.stringify(continuePayload).length
+          if (hasToolCalls) {
+            proxyLogger.info('ProxyServer', 'Claude single-pass stream mode active', {
+              tools: Array.from(pendingToolCalls.values()).map((tool) => tool.name)
             })
+          }
 
-            try {
-              await this.handleClaudeStream(res, account, continuePayload, model, startTime, currentRound + 1, id, true, currentBlockIndex, matchedApiKey)
-            } catch (error) {
-              console.error('[ProxyServer] Claude auto-continue error:', error)
-            }
-            resolve()
-          } else {
             // 发送 message_delta（包含完整 usage 信息）
             const stopReason = hasToolCalls ? 'tool_use' : 'end_turn'
             const messageDelta = createClaudeStreamEvent('message_delta', {
@@ -1763,9 +1769,13 @@ export class ProxyServer {
             res.write(`event: message_stop\ndata: ${JSON.stringify(messageStop)}\n\n`)
             res.end()
             resolve()
-          }
         },
         (error) => {
+          if (isStreamClosed()) {
+            resolve()
+            return
+          }
+
           console.error('[ProxyServer] Stream error:', error)
           const isQuotaError = this.isHighVolumeError(error.message)
           const responseMessage = isQuotaError
@@ -1783,7 +1793,8 @@ export class ProxyServer {
           this.events.onResponse?.({ path: '/v1/messages', model, status: 500, error: responseMessage })
           this.recordRequest({ path: '/v1/messages', model, accountId: account.id, responseTime: Date.now() - startTime, success: false, error: responseMessage })
           resolve()
-        }
+        },
+        abortSignal
       )
     })
   }
@@ -1826,31 +1837,6 @@ export class ProxyServer {
       req.on('end', () => resolve(body))
       req.on('error', reject)
     })
-  }
-
-  // 本地执行工具调用（用于 auto-continue，避免 AI 因拿不到真实数据而死循环）
-  private executeToolLocally(name: string, input: any): string {
-    try {
-      if (name === 'read_file') {
-        const { filePath, startLine, endLine } = input
-        if (!filePath) return 'Error: filePath is required'
-        const content = fs.readFileSync(filePath, 'utf-8')
-        const lines = content.split('\n')
-        const start = Math.max(0, (startLine || 1) - 1)
-        const end = endLine ? Math.min(lines.length, endLine) : lines.length
-        const sliced = lines.slice(start, end).join('\n')
-        return sliced || '(empty)'
-      }
-      if (name === 'list_dir') {
-        const { path: dirPath } = input
-        if (!dirPath) return 'Error: path is required'
-        const entries = fs.readdirSync(dirPath, { withFileTypes: true })
-        return entries.map(e => e.isDirectory() ? e.name + '/' : e.name).join('\n') || '(empty directory)'
-      }
-    } catch (error) {
-      return `Error executing tool ${name}: ${(error as Error).message}`
-    }
-    return 'Done. Continue with the next step.'
   }
 
   // 发送错误响应
