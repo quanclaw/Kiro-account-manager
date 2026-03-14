@@ -352,19 +352,15 @@ export function buildKiroPayload(
     userInputMessage: currentUserInputMessage
   }
 
-  // 清理并准备所有消息（history + currentMessage）
-  const allMessages = [...history, currentMessage]
-  const sanitizedMessages = sanitizeConversation(allMessages)
-  
-  // 分离 history 和 currentMessage
-  // currentMessage 是最后一条消息，history 是其余的
-  const sanitizedHistory = sanitizedMessages.slice(0, -1)
+
+  // 清理并准备所有消息（history + currentMessage），并限制 payload 大小
+  let allMessages = [...history, currentMessage]
+  let sanitizedMessages = sanitizeConversation(allMessages)
+  let sanitizedHistory = sanitizedMessages.slice(0, -1)
   let finalCurrentMessage = sanitizedMessages.at(-1)!
 
   // 确保 currentMessage 是 user 消息（sanitizeConversation 保证以 user 消息结束）
-  // 并确保包含 tools
   if (!finalCurrentMessage.userInputMessage) {
-    // 如果清理后最后一条不是 user 消息，创建一个新的
     finalCurrentMessage = {
       userInputMessage: {
         content: finalContent || 'Continue',
@@ -373,14 +369,10 @@ export function buildKiroPayload(
       }
     }
   }
-  
-  // 确保 modelId 和 origin 存在于最终消息中
   if (finalCurrentMessage.userInputMessage) {
     finalCurrentMessage.userInputMessage.modelId = modelId
     finalCurrentMessage.userInputMessage.origin = origin
   }
-  
-  // 确保 currentMessage 包含 tools
   if (tools.length > 0) {
     finalCurrentMessage.userInputMessage!.userInputMessageContext = {
       ...finalCurrentMessage.userInputMessage!.userInputMessageContext,
@@ -388,7 +380,9 @@ export function buildKiroPayload(
     }
   }
 
-  const payload: KiroPayload = {
+  // 限制 payload 大小（最大 1MB）
+  const MAX_PAYLOAD_SIZE = 1048576 // 1MB
+  let payload: KiroPayload = {
     conversationState: {
       chatTriggerType: 'MANUAL',
       conversationId: uuidv4(),
@@ -396,6 +390,26 @@ export function buildKiroPayload(
         userInputMessage: finalCurrentMessage.userInputMessage!
       },
       history: sanitizedHistory.length > 0 ? sanitizedHistory : undefined
+    }
+  }
+
+  // 如果超出最大 payload 大小，循环移除最早的 history 直到满足要求
+  let payloadStr = JSON.stringify(payload)
+  while (payloadStr.length > MAX_PAYLOAD_SIZE && sanitizedHistory.length > 0) {
+    sanitizedHistory.shift()
+    payload.conversationState.history = sanitizedHistory.length > 0 ? sanitizedHistory : undefined
+    payloadStr = JSON.stringify(payload)
+  }
+  if (payloadStr.length > MAX_PAYLOAD_SIZE) {
+    // 仍然超出，清空 history 并只保留当前消息
+    payload.conversationState.history = undefined
+    payloadStr = JSON.stringify(payload)
+  }
+  if (payloadStr.length > MAX_PAYLOAD_SIZE) {
+    // 仍然超出，截断 content
+    if (payload.conversationState.currentMessage.userInputMessage?.content) {
+      payload.conversationState.currentMessage.userInputMessage.content = payload.conversationState.currentMessage.userInputMessage.content.slice(0, 1000)
+      payloadStr = JSON.stringify(payload)
     }
   }
 
@@ -423,7 +437,8 @@ export function buildKiroPayload(
     sanitizedHistoryLength: sanitizedHistory.length,
     toolsCount: tools.length,
     toolResultsCount: toolResults.length,
-    hasProfileArn: !!profileArn
+    hasProfileArn: !!profileArn,
+    finalPayloadSize: payloadStr.length
   })
 
   return payload
